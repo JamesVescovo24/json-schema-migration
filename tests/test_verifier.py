@@ -2,7 +2,6 @@ import hashlib
 import pytest
 from contract import BatchInput, SaveInput, SaveOutput, UserV2
 from plugin.logic import pin_reference, read_dataset, save_candidate
-from plugin.storage import REPORT_PATH
 from verifier import verify_input, verify_output, verify_task
 
 @pytest.mark.parametrize('batch',['messy','international','empty'])
@@ -36,11 +35,14 @@ def test_wrong_migration(tmp_path,problem):
 def test_reject_tampered_or_missing_file(tmp_path):
     task=BatchInput('empty');pin=pin_reference(task,tmp_path)
     out=save_candidate(SaveInput('empty',[]),tmp_path)
-    (tmp_path/REPORT_PATH).write_bytes(b'not json')
+    (tmp_path/out.path).write_bytes(b'not json')
     assert not verify_task('migrate-users',task,out,pin,str(tmp_path))['valid']
     out.digest=hashlib.sha256(b'not json').hexdigest()
+    malformed_path = f'reports/result-{out.digest}.json'
+    (tmp_path/out.path).rename(tmp_path/malformed_path)
+    out.path = malformed_path
     assert not verify_task('migrate-users',task,out,pin,str(tmp_path))['valid']
-    (tmp_path/REPORT_PATH).unlink()
+    (tmp_path/out.path).unlink()
     assert not verify_task('migrate-users',task,out,pin,str(tmp_path))['valid']
 
 def test_bad_input_and_reference(tmp_path):
